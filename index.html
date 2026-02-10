@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google-site-verification" content="PASTE_YOUR_CODE_HERE" />
+    <title>Nitadol Bank | Private Euro Excellence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: true
+            }, 'google_translate_element');
+            
+            setTimeout(() => {
+                const userLang = navigator.language || navigator.userLanguage;
+                const langCode = userLang.split('-')[0];
+                const select = document.querySelector('select.goog-te-combo');
+                if (select && langCode !== 'en') {
+                    select.value = langCode;
+                    select.dispatchEvent(new Event('change'));
+                }
+            }, 1000);
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, set, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        // ADDED STORAGE FOR PROFILE PICTURES
+        import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAHmoQxPqIKLhnvMUrcfgpRRI574GZ_NmE",
+            authDomain: "nitadol-bank-cc76f.firebaseapp.com",
+            databaseURL: "https://nitadol-bank-cc76f-default-rtdb.firebaseio.com",
+            projectId: "nitadol-bank-cc76f",
+            storageBucket: "nitadol-bank-cc76f.firebasestorage.app",
+            messagingSenderId: "765485856906",
+            appId: "1:765485856906:web:599e92fcc47cef35745573",
+            measurementId: "G-DCBVF0BBPB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const rtdb = getDatabase(app);
+        const storage = getStorage(app);
+
+        let currentUserData = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                toggleViews('dashboard');
+                document.getElementById('main-nav').style.display = 'none';
+                onValue(ref(rtdb, 'users/' + user.uid), (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        currentUserData = data;
+                        updateDashboardUI(data);
+                        updateProfileUI(data);
+                    }
+                });
+            } else {
+                toggleViews('home-page');
+                document.getElementById('main-nav').style.display = 'flex';
+            }
+        });
+
+        window.toggleViews = (activeId) => {
+            ['home-page', 'auth-page', 'signup-page', 'dashboard'].forEach(id => {
+                const el = document.getElementById(id);
+                if (id === activeId) {
+                    el.classList.remove('hidden');
+                    if(id !== 'dashboard') el.style.display = 'block';
+                } else {
+                    el.classList.add('hidden');
+                    el.style.display = 'none';
+                }
+            });
+            window.scrollTo(0,0);
+        };
+
+        function updateDashboardUI(data) {
+            const balanceEl = document.getElementById('user-balance');
+            const balanceText = "€" + (data.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+            balanceEl.innerText = balanceText;
+
+            // UPDATE PROFILE PICTURE IN DASHBOARD
+            const dashPic = document.getElementById('dash-profile-pic');
+            const modalPic = document.getElementById('modal-profile-pic');
+            if (data.profilePic) {
+                dashPic.src = data.profilePic;
+                modalPic.src = data.profilePic;
+            }
+
+            if (balanceText.length > 15) { balanceEl.style.fontSize = "2rem"; } 
+            else if (balanceText.length > 12) { balanceEl.style.fontSize = "2.5rem"; } 
+            else if (balanceText.length > 9) { balanceEl.style.fontSize = "3rem"; } 
+            else { balanceEl.style.fontSize = "3.75rem"; }
+
+            document.getElementById('card-holder-name').innerText = data.fullName.toUpperCase();
+            document.getElementById('welcome-name').innerText = data.fullName.split(' ')[0];
+            const historyCont = document.getElementById('transaction-history');
+            historyCont.innerHTML = '';
+            if(data.transactions) {
+                Object.values(data.transactions).reverse().forEach(tx => {
+                    const item = document.createElement('div');
+                    item.className = "flex justify-between items-center p-5 mb-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50";
+                    item.innerHTML = `<div class="text-left"><p class="font-bold text-sm uppercase">${tx.type}</p><p class="text-[10px] text-slate-500">${tx.date}</p></div><div class="text-right"><p class="font-black ${tx.status === 'Failed' ? 'text-red-500' : 'text-green-500'}">€${tx.amount}</p><p class="text-[9px] uppercase font-bold opacity-60">${tx.status}</p></div>`;
+                    historyCont.appendChild(item);
+                });
+            } else {
+                historyCont.innerHTML = `<div class="py-20 text-center opacity-30 italic">No ledger entries found.</div>`;
+            }
+        }
+
+        function updateProfileUI(data) {
+            document.getElementById('p-full-name').innerText = data.fullName;
+            document.getElementById('p-email').innerText = data.email;
+            document.getElementById('p-phone').innerText = data.phone || 'N/A';
+            document.getElementById('p-country').innerText = data.country || 'N/A';
+            document.getElementById('p-address').innerText = data.address || 'N/A';
+            document.getElementById('p-postal').innerText = data.postalCode || 'N/A';
+        }
+
+        window.handleLogin = async () => {
+            const email = document.getElementById('l-email').value;
+            const pass = document.getElementById('l-pass').value;
+            try { await signInWithEmailAndPassword(auth, email, pass); }
+            catch (e) { alert(e.message); }
+        };
+
+        window.handleSignup = async () => {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Securing Assets...";
+            
+            const email = document.getElementById('s-email').value;
+            const pass = document.getElementById('s-pass').value;
+            const name = document.getElementById('s-name').value;
+            const pin = document.getElementById('s-pin').value;
+            const phone = document.getElementById('s-phone').value;
+            const country = document.getElementById('s-country').value;
+            const address = document.getElementById('s-address').value;
+            const postal = document.getElementById('s-postal').value;
+            
+            const profileFile = document.getElementById('s-profile-pic').files[0];
+
+            try {
+                const res = await createUserWithEmailAndPassword(auth, email, pass);
+                const uid = res.user.uid;
+                let profileUrl = "https://ui-avatars.com/api/?name=" + name + "&background=2563eb&color=fff";
+
+                // Upload profile pic if selected
+                if (profileFile) {
+                    const pRef = sRef(storage, `users/${uid}/profile.jpg`);
+                    await uploadBytes(pRef, profileFile);
+                    profileUrl = await getDownloadURL(pRef);
+                }
+
+                await set(ref(rtdb, 'users/' + uid), {
+                    fullName: name, email, pin, phone, country, address, postalCode: postal, 
+                    balance: 0, currency: "EUR", profilePic: profileUrl, joinDate: new Date().toLocaleDateString()
+                });
+            } catch (e) { alert(e.message); btn.innerText = originalText; }
+        };
+
+        window.processTransaction = async () => {
+            const amount = document.getElementById('tx-amount').value;
+            const pin = document.getElementById('tx-pin-input').value;
+            if (pin !== currentUserData.pin) { alert("Invalid Security PIN"); return; }
+            await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), {
+                amount: parseFloat(amount).toFixed(2),
+                type: document.getElementById('modal-title').innerText,
+                date: new Date().toLocaleString(),
+                status: "Failed"
+            });
+            document.getElementById('trans-pin').classList.add('hidden');
+            document.getElementById('error-screen').classList.remove('hidden');
+        };
+
+        window.logout = () => signOut(auth);
+        window.openModal = (t) => {
+            document.getElementById('modal-title').innerText = t.toUpperCase();
+            document.getElementById('trans-modal').classList.remove('hidden');
+            document.getElementById('trans-modal').classList.add('flex');
+        };
+        window.closeModal = () => {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
+            document.getElementById('error-screen').classList.add('hidden');
+            document.getElementById('trans-input').classList.remove('hidden');
+            document.getElementById('trans-pin').classList.add('hidden');
+        };
+        window.triggerPin = () => {
+            document.getElementById('trans-input').classList.add('hidden');
+            document.getElementById('trans-pin').classList.remove('hidden');
+        };
+        window.showView = (v) => v === 'login' ? toggleViews('auth-page') : (v === 'signup' ? toggleViews('signup-page') : toggleViews('home-page'));
+        window.openProfile = () => document.getElementById('profile-modal').classList.remove('hidden');
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+        * { font-family: 'Outfit', sans-serif; scroll-behavior: smooth; }
+        .hidden { display: none !important; }
+        #google_translate_element { display: none; }
+        .partner-scroll { display: flex; width: 200%; animation: scroll 20s linear infinite; }
+        @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .atm-card { background: linear-gradient(145deg, #0f172a 0%, #334155 100%); border: 1px solid rgba(255,255,255,0.1); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
+        #user-balance { transition: font-size 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
+
+    <div id="google_translate_element"></div>
+
+    <nav id="main-nav" class="fixed w-full z-[100] bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b dark:border-slate-800 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="showView('home')">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black">N</div>
+            <span class="text-lg font-black tracking-tighter">NITADOL BANK</span>
+        </div>
+        <div class="flex items-center gap-6">
+            <button onclick="showView('login')" class="text-xs font-bold opacity-60 hover:opacity-100 transition">LOGIN</button>
+            <button onclick="showView('signup')" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-blue-500/30">OPEN ACCOUNT</button>
+        </div>
+    </nav>
+
+    <div id="home-page">
+        <section class="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden bg-slate-950">
+            <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070" class="absolute inset-0 w-full h-full object-cover opacity-30">
+            <div class="relative z-10 text-center px-6 max-w-5xl">
+                <h1 class="text-6xl md:text-8xl font-black text-white leading-tight mb-8">Redefining <br><span class="text-blue-500">Global Wealth.</span></h1>
+                <p class="text-slate-400 text-lg md:text-2xl mb-12 max-w-2xl mx-auto">Nitadol Bank provides bespoke financial solutions for international entrepreneurs and private collectors.</p>
+                <div class="flex flex-col md:flex-row justify-center gap-4">
+                    <button onclick="showView('signup')" class="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-blue-700 transition">Get Started Today</button>
+                    <a href="#about" class="bg-white/10 backdrop-blur-md text-white px-10 py-5 rounded-2xl font-black text-lg border border-white/20">Learn More</a>
+                </div>
+            </div>
+        </section>
+
+        <div class="bg-white dark:bg-slate-900 py-10 border-y dark:border-slate-800 overflow-hidden">
+            <div class="partner-scroll">
+                <div class="flex justify-around w-full items-center grayscale opacity-50 px-10 space-x-20">
+                    <span class="text-2xl font-black italic tracking-widest">VISA ELITE</span>
+                    <span class="text-2xl font-black italic tracking-widest">SWIFT</span>
+                    <span class="text-2xl font-black italic tracking-widest">GOLDMAN TRUST</span>
+                    <span class="text-2xl font-black italic tracking-widest">EURO CLEAR</span>
+                    <span class="text-2xl font-black italic tracking-widest">J.P. MORGAN</span>
+                </div>
+                <div class="flex justify-around w-full items-center grayscale opacity-50 px-10 space-x-20">
+                    <span class="text-2xl font-black italic tracking-widest">VISA ELITE</span>
+                    <span class="text-2xl font-black italic tracking-widest">SWIFT</span>
+                    <span class="text-2xl font-black italic tracking-widest">GOLDMAN TRUST</span>
+                    <span class="text-2xl font-black italic tracking-widest">EURO CLEAR</span>
+                    <span class="text-2xl font-black italic tracking-widest">J.P. MORGAN</span>
+                </div>
+            </div>
+        </div>
+
+        <section id="about" class="py-32 px-6 bg-white dark:bg-slate-950">
+            <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-20 items-center">
+                <div class="relative">
+                    <img src="https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?q=80&w=1973" class="rounded-[3rem] shadow-2xl">
+                    <div class="absolute -bottom-10 -right-10 bg-blue-600 p-10 rounded-[2rem] text-white hidden md:block">
+                        <p class="text-4xl font-black">24/7</p>
+                        <p class="text-xs font-bold uppercase tracking-widest">Global Concierge</p>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-4xl md:text-6xl font-black mb-8 leading-tight">About <span class="text-blue-600">Nitadol.</span></h2>
+                    <p class="text-slate-500 dark:text-slate-400 text-lg mb-8 leading-relaxed">Founded on the principles of discretion and digital innovation, Nitadol Bank serves as the bridge between traditional European banking and the modern digital economy.</p>
+                    <ul class="space-y-4 mb-10">
+                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> End-to-End Encryption</li>
+                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> Instant Cross-Border SEPA Transfers</li>
+                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> Multi-Currency Digital Vaults</li>
+                    </ul>
+                    <button onclick="showView('signup')" class="text-blue-600 font-black flex items-center gap-2 group">
+                        Explore Wealth Services <span class="group-hover:translate-x-2 transition">→</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="bg-slate-950 text-slate-600 py-20 px-6 border-t border-slate-900">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10 text-center md:text-left">
+                <div><h3 class="text-white font-black text-xl mb-2 italic">NITADOL</h3><p class="text-[10px] uppercase tracking-widest">Security | Growth | Discretion</p></div>
+                <div class="flex gap-10 text-[10px] font-black uppercase tracking-widest"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">AML Policy</a></div>
+                <p class="text-[10px]">© 2026 Nitadol Financial Group. All Rights Reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <div id="signup-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 py-12 px-4">
+        <div class="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
+            <h2 class="text-3xl font-black mb-2">Create Global Account</h2>
+            <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Personal & Security Details</p>
+            
+            <div class="grid md:grid-cols-2 gap-4 mb-6">
+                <div class="col-span-full mb-4">
+                    <label class="block text-[10px] font-black uppercase opacity-40 mb-2">Profile Picture</label>
+                    <input id="s-profile-pic" type="file" accept="image/*" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl text-xs">
+                </div>
+
+                <input id="s-name" type="text" placeholder="Full Legal Name" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-email" type="email" placeholder="Email Address" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-phone" type="tel" placeholder="Phone Number (e.g. +1...)" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-country" type="text" placeholder="Country of Residence" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-address" type="text" placeholder="Residential Address" class="col-span-full p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-postal" type="text" placeholder="Postal / Zip Code" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-pin" type="password" maxlength="4" placeholder="4-Digit Security PIN" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-pass" type="password" placeholder="Account Password" class="col-span-full p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+            </div>
+
+            <div class="mb-8 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl text-center">
+                <p class="text-xs font-black uppercase opacity-40 mb-2">Upload Identity Document (ID/Passport)</p>
+                <input type="file" id="s-doc" class="hidden">
+                <label for="s-doc" class="cursor-pointer text-blue-600 font-bold text-sm">Click to select photo or scan</label>
+            </div>
+
+            <button onclick="handleSignup()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl mb-4">Complete Application</button>
+            <button onclick="showView('home')" class="w-full text-slate-400 font-bold text-xs uppercase">Cancel</button>
+        </div>
+    </div>
+
+    <div id="auth-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-6">
+        <div class="bg-white dark:bg-slate-900 p-10 rounded-[3rem] w-full max-w-md shadow-2xl text-center">
+            <h2 class="text-3xl font-black mb-8">Access Vault</h2>
+            <input id="l-email" type="email" placeholder="Email" class="w-full p-4 mb-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 mb-8 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Authorize Entry</button>
+            <p onclick="showView('signup')" class="mt-6 text-xs font-bold text-blue-600 cursor-pointer uppercase">Join Nitadol</p>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden min-h-screen flex bg-slate-50 dark:bg-slate-950">
+        <aside class="w-80 bg-slate-900 dark:bg-slate-950 text-white p-10 flex flex-col fixed h-full border-r border-white/5">
+            <div class="mb-12"><h2 class="text-2xl font-black italic">NITADOL</h2><p class="text-[9px] text-blue-500 font-black tracking-widest uppercase">Private Wealth</p></div>
+            <nav class="flex-1 space-y-8">
+                <div class="flex items-center gap-4 text-blue-500 font-black cursor-pointer"><span>📊</span> Dashboard</div>
+                <div class="flex items-center gap-4 opacity-40 cursor-pointer" onclick="openProfile()"><span>👤</span> User Details</div>
+                <div class="flex items-center gap-4 opacity-40"><span>🌍</span> Transfers</div>
+            </nav>
+            <button onclick="logout()" class="text-red-500 font-black text-xs pt-10 border-t border-white/5 uppercase">Logout System ⏻</button>
+        </aside>
+
+        <main class="flex-1 ml-80 p-8 md:p-16">
+            <div class="max-w-5xl mx-auto">
+                <div class="flex justify-between items-center mb-16">
+                    <div><h2 class="text-4xl font-black">Welcome, <span id="welcome-name" class="text-blue-600">Client</span></h2><p class="text-slate-500 font-bold text-xs uppercase mt-2">Status: <span class="text-green-500">Verified Account</span></p></div>
+                    <img id="dash-profile-pic" src="https://ui-avatars.com/api/?name=U&background=ffffff&color=2563eb" 
+                         class="w-16 h-16 rounded-full border-2 border-white shadow-lg cursor-pointer object-cover" 
+                         onclick="openProfile()">
+                </div>
+
+                <div class="grid lg:grid-cols-2 gap-10 mb-16">
+                    <div class="atm-card h-72 p-10 rounded-[3rem] text-white flex flex-col justify-between shadow-2xl">
+                        <div class="flex justify-between items-start"><div class="w-12 h-8 bg-gradient-to-br from-yellow-300 to-yellow-600 rounded-md"></div><span class="font-black italic text-xl uppercase">Elite Visa</span></div>
+                        <p class="text-2xl tracking-[0.3em] font-light">4492 **** **** 9912</p>
+                        <div class="flex justify-between items-end"><div><p class="text-[8px] uppercase opacity-50 font-black">Card Holder</p><p id="card-holder-name" class="font-black tracking-widest text-sm">...</p></div><p class="font-black text-sm">12/28</p></div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-xl border dark:border-slate-800 flex flex-col justify-center min-h-[18rem]">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Liquid Assets (EUR)</p>
+                        <h1 id="user-balance" class="font-black tracking-tighter leading-none mb-10 overflow-hidden whitespace-nowrap">€0.00</h1>
+                        <div class="grid grid-cols-3 gap-4">
+                            <button onclick="openModal('transfer')" class="bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg shadow-blue-500/20">TRANSFER</button>
+                            <button onclick="openModal('withdraw')" class="bg-slate-100 dark:bg-slate-800 py-4 rounded-2xl font-black text-[10px]">WITHDRAW</button>
+                            <button onclick="openModal('deposit')" class="bg-slate-100 dark:bg-slate-800 py-4 rounded-2xl font-black text-[10px]">DEPOSIT</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-xl border dark:border-slate-800">
+                    <h3 class="text-xl font-black mb-10 flex items-center gap-3"><span class="w-1.5 h-6 bg-blue-600 rounded-full"></span> Transaction Ledger</h3>
+                    <div id="transaction-history" class="space-y-4"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="profile-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[250] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
+            <div class="flex flex-col items-center mb-8">
+                <img id="modal-profile-pic" src="https://ui-avatars.com/api/?name=U&background=ffffff&color=2563eb" class="w-24 h-24 rounded-full border-4 border-blue-600 shadow-xl mb-4 object-cover">
+                <h2 class="text-3xl font-black">Client Dossier</h2>
+            </div>
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><p class="text-[10px] font-black opacity-40 uppercase">Legal Name</p><p id="p-full-name" class="font-bold">...</p></div>
+                    <div><p class="text-[10px] font-black opacity-40 uppercase">Email Address</p><p id="p-email" class="font-bold">...</p></div>
+                    <div><p class="text-[10px] font-black opacity-40 uppercase">Phone Number</p><p id="p-phone" class="font-bold">...</p></div>
+                    <div><p class="text-[10px] font-black opacity-40 uppercase">Country</p><p id="p-country" class="font-bold">...</p></div>
+                    <div class="col-span-full"><p class="text-[10px] font-black opacity-40 uppercase">Residential Address</p><p id="p-address" class="font-bold">...</p></div>
+                    <div><p class="text-[10px] font-black opacity-40 uppercase">Postal Code</p><p id="p-postal" class="font-bold">...</p></div>
+                </div>
+                <div class="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-500 text-[10px] font-black text-center uppercase tracking-widest">Verification Status: Level 3 Approved</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative border border-slate-800/50 max-h-[90vh] overflow-y-auto custom-scroll">
+            <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
+            
+            <div id="trans-input" class="space-y-6">
+                <h2 id="modal-title" class="text-2xl font-black uppercase">Transfer</h2>
+                <div class="grid gap-4">
+                    <div>
+                        <label class="text-[10px] font-black opacity-40 uppercase">Amount (€)</label>
+                        <input id="tx-amount" type="number" placeholder="0.00" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-2xl outline-none text-2xl font-black">
+                    </div>
+                    <input type="text" placeholder="Beneficiary Full Name" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
+                    <input type="text" placeholder="Beneficiary Bank Name" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
+                    <input type="text" placeholder="IBAN / Account Number" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="text" placeholder="SWIFT / BIC" class="p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
+                        <input type="text" placeholder="Bank Country" class="p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
+                    </div>
+                </div>
+                <button onclick="triggerPin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Process Clearance</button>
+            </div>
+
+            <div id="trans-pin" class="hidden text-center space-y-6 py-8">
+                <p class="font-black text-lg">Enter Transaction PIN</p>
+                <input id="tx-pin-input" type="password" maxlength="4" placeholder="••••" class="text-center text-5xl tracking-widest w-full bg-transparent border-b-2 border-slate-200 dark:border-slate-800 outline-none font-black py-4">
+                <button onclick="processTransaction()" class="w-full bg-slate-900 dark:bg-white dark:text-black py-5 rounded-2xl font-black">Sign & Send</button>
+            </div>
+
+            <div id="error-screen" class="hidden text-center py-6">
+                <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">⚠️</div>
+                <h2 class="text-2xl font-black text-red-600 mb-4 uppercase leading-none">Transaction Rejected</h2>
+                <div class="p-6 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-100 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 font-bold mb-6">
+                    SECURITY NOTICE: Manual clearance required for international transfers. <br><br> Support: <span class="underline">nitadolbank@gmail.com</span>
+                </div>
+                <button onclick="closeModal()" class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black">Close</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
