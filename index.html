@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="google-site-verification" content="PASTE_YOUR_CODE_HERE" />
+    <meta name="google-site-verification" content="dFJ1ENXdwas5U2FE1rdwFuBEq6NvBbQ2bgaU1wxuFnQ" />
     <title>Nitadol Bank | Private Euro Excellence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -32,7 +32,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getDatabase, ref, onValue, set, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        // ADDED STORAGE FOR PROFILE PICTURES
         import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -76,7 +75,11 @@
                 const el = document.getElementById(id);
                 if (id === activeId) {
                     el.classList.remove('hidden');
-                    if(id !== 'dashboard') el.style.display = 'block';
+                    if(id === 'dashboard') {
+                        el.style.display = 'flex';
+                    } else {
+                        el.style.display = 'block';
+                    }
                 } else {
                     el.classList.add('hidden');
                     el.style.display = 'none';
@@ -85,12 +88,25 @@
             window.scrollTo(0,0);
         };
 
+        // NEW: Visual feedback for file uploads
+        document.addEventListener('change', async (e) => {
+            if (e.target.type === 'file') {
+                const file = e.target.files[0];
+                const labelId = e.target.id + '-label';
+                const labelEl = document.getElementById(labelId);
+                if (file && labelEl) {
+                    labelEl.innerText = "Selected: " + file.name;
+                    labelEl.classList.remove('opacity-40');
+                    labelEl.classList.add('text-green-500', 'font-bold');
+                }
+            }
+        });
+
         function updateDashboardUI(data) {
             const balanceEl = document.getElementById('user-balance');
             const balanceText = "€" + (data.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
             balanceEl.innerText = balanceText;
 
-            // UPDATE PROFILE PICTURE IN DASHBOARD
             const dashPic = document.getElementById('dash-profile-pic');
             const modalPic = document.getElementById('modal-profile-pic');
             if (data.profilePic) {
@@ -98,10 +114,9 @@
                 modalPic.src = data.profilePic;
             }
 
-            if (balanceText.length > 15) { balanceEl.style.fontSize = "2rem"; } 
-            else if (balanceText.length > 12) { balanceEl.style.fontSize = "2.5rem"; } 
-            else if (balanceText.length > 9) { balanceEl.style.fontSize = "3rem"; } 
-            else { balanceEl.style.fontSize = "3.75rem"; }
+            if (balanceText.length > 15) { balanceEl.style.fontSize = "1.8rem"; } 
+            else if (balanceText.length > 12) { balanceEl.style.fontSize = "2.2rem"; } 
+            else { balanceEl.style.fontSize = "2.8rem"; }
 
             document.getElementById('card-holder-name').innerText = data.fullName.toUpperCase();
             document.getElementById('welcome-name').innerText = data.fullName.split(' ')[0];
@@ -110,12 +125,12 @@
             if(data.transactions) {
                 Object.values(data.transactions).reverse().forEach(tx => {
                     const item = document.createElement('div');
-                    item.className = "flex justify-between items-center p-5 mb-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50";
-                    item.innerHTML = `<div class="text-left"><p class="font-bold text-sm uppercase">${tx.type}</p><p class="text-[10px] text-slate-500">${tx.date}</p></div><div class="text-right"><p class="font-black ${tx.status === 'Failed' ? 'text-red-500' : 'text-green-500'}">€${tx.amount}</p><p class="text-[9px] uppercase font-bold opacity-60">${tx.status}</p></div>`;
+                    item.className = "flex justify-between items-center p-4 mb-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm";
+                    item.innerHTML = `<div class="text-left"><p class="font-bold text-xs uppercase">${tx.type}</p><p class="text-[9px] text-slate-500">${tx.date}</p></div><div class="text-right"><p class="font-black text-sm ${tx.status === 'Failed' ? 'text-red-500' : 'text-green-500'}">€${tx.amount}</p><p class="text-[8px] uppercase font-bold opacity-60">${tx.status}</p></div>`;
                     historyCont.appendChild(item);
                 });
             } else {
-                historyCont.innerHTML = `<div class="py-20 text-center opacity-30 italic">No ledger entries found.</div>`;
+                historyCont.innerHTML = `<div class="py-10 text-center opacity-30 italic text-sm">No ledger entries found.</div>`;
             }
         }
 
@@ -136,9 +151,10 @@
         };
 
         window.handleSignup = async () => {
-            const btn = event.target;
+            const btn = document.getElementById('signup-btn');
             const originalText = btn.innerText;
             btn.innerText = "Securing Assets...";
+            btn.disabled = true;
             
             const email = document.getElementById('s-email').value;
             const pass = document.getElementById('s-pass').value;
@@ -148,7 +164,6 @@
             const country = document.getElementById('s-country').value;
             const address = document.getElementById('s-address').value;
             const postal = document.getElementById('s-postal').value;
-            
             const profileFile = document.getElementById('s-profile-pic').files[0];
 
             try {
@@ -156,7 +171,6 @@
                 const uid = res.user.uid;
                 let profileUrl = "https://ui-avatars.com/api/?name=" + name + "&background=2563eb&color=fff";
 
-                // Upload profile pic if selected
                 if (profileFile) {
                     const pRef = sRef(storage, `users/${uid}/profile.jpg`);
                     await uploadBytes(pRef, profileFile);
@@ -167,13 +181,23 @@
                     fullName: name, email, pin, phone, country, address, postalCode: postal, 
                     balance: 0, currency: "EUR", profilePic: profileUrl, joinDate: new Date().toLocaleDateString()
                 });
-            } catch (e) { alert(e.message); btn.innerText = originalText; }
+                
+                // INSTANT REDIRECT
+                toggleViews('dashboard');
+            } catch (e) { 
+                alert(e.message); 
+                btn.innerText = originalText; 
+                btn.disabled = false;
+            }
         };
 
         window.processTransaction = async () => {
             const amount = document.getElementById('tx-amount').value;
             const pin = document.getElementById('tx-pin-input').value;
-            if (pin !== currentUserData.pin) { alert("Invalid Security PIN"); return; }
+            if (pin !== currentUserData.pin) { 
+                document.getElementById('pin-error').classList.remove('hidden');
+                return; 
+            }
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), {
                 amount: parseFloat(amount).toFixed(2),
                 type: document.getElementById('modal-title').innerText,
@@ -195,6 +219,7 @@
             document.getElementById('error-screen').classList.add('hidden');
             document.getElementById('trans-input').classList.remove('hidden');
             document.getElementById('trans-pin').classList.add('hidden');
+            document.getElementById('pin-error').classList.add('hidden');
         };
         window.triggerPin = () => {
             document.getElementById('trans-input').classList.add('hidden');
@@ -206,244 +231,227 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
-        * { font-family: 'Outfit', sans-serif; scroll-behavior: smooth; }
+        * { font-family: 'Outfit', sans-serif; scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
         .hidden { display: none !important; }
         #google_translate_element { display: none; }
         .partner-scroll { display: flex; width: 200%; animation: scroll 20s linear infinite; }
         @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .atm-card { background: linear-gradient(145deg, #0f172a 0%, #334155 100%); border: 1px solid rgba(255,255,255,0.1); }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
-        #user-balance { transition: font-size 0.3s ease; }
+        .custom-scroll::-webkit-scrollbar { width: 0px; }
+        #user-balance { transition: all 0.3s ease; }
+        input::placeholder { opacity: 0.5; }
+        
+        /* Mobile Specific tweaks */
+        @media (max-width: 768px) {
+            #dashboard { flex-direction: column; }
+            aside { 
+                width: 100%; height: auto; position: fixed; bottom: 0; left: 0; 
+                flex-direction: row; padding: 15px; border-r: 0; border-top: 1px solid rgba(255,255,255,0.1);
+                z-index: 100; justify-content: space-around;
+            }
+            aside .mb-12, aside button { display: none; }
+            aside nav { flex-direction: row; width: 100%; justify-content: space-around; space-y: 0; }
+            aside nav div { flex-direction: column; font-size: 10px; gap: 4px; opacity: 0.6; }
+            main { margin-left: 0; padding-bottom: 100px; padding-top: 40px; }
+            .mobile-logout { display: block !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
 
     <div id="google_translate_element"></div>
 
-    <nav id="main-nav" class="fixed w-full z-[100] bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b dark:border-slate-800 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-2 cursor-pointer" onclick="showView('home')">
-            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black">N</div>
-            <span class="text-lg font-black tracking-tighter">NITADOL BANK</span>
+    <nav id="main-nav" class="fixed w-full z-[100] bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b dark:border-slate-800 px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-2" onclick="showView('home')">
+            <div class="w-7 h-7 bg-blue-600 rounded flex items-center justify-center text-white font-black text-sm">N</div>
+            <span class="text-md font-black tracking-tighter uppercase">Nitadol</span>
         </div>
-        <div class="flex items-center gap-6">
-            <button onclick="showView('login')" class="text-xs font-bold opacity-60 hover:opacity-100 transition">LOGIN</button>
-            <button onclick="showView('signup')" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-blue-500/30">OPEN ACCOUNT</button>
+        <div class="flex items-center gap-4">
+            <button onclick="showView('login')" class="text-[10px] font-bold opacity-60">LOGIN</button>
+            <button onclick="showView('signup')" class="bg-blue-600 text-white px-4 py-2 rounded-full font-bold text-[10px] shadow-lg">OPEN ACCOUNT</button>
         </div>
     </nav>
 
     <div id="home-page">
         <section class="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden bg-slate-950">
             <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070" class="absolute inset-0 w-full h-full object-cover opacity-30">
-            <div class="relative z-10 text-center px-6 max-w-5xl">
-                <h1 class="text-6xl md:text-8xl font-black text-white leading-tight mb-8">Redefining <br><span class="text-blue-500">Global Wealth.</span></h1>
-                <p class="text-slate-400 text-lg md:text-2xl mb-12 max-w-2xl mx-auto">Nitadol Bank provides bespoke financial solutions for international entrepreneurs and private collectors.</p>
-                <div class="flex flex-col md:flex-row justify-center gap-4">
-                    <button onclick="showView('signup')" class="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-blue-700 transition">Get Started Today</button>
-                    <a href="#about" class="bg-white/10 backdrop-blur-md text-white px-10 py-5 rounded-2xl font-black text-lg border border-white/20">Learn More</a>
+            <div class="relative z-10 text-center px-6">
+                <h1 class="text-5xl md:text-8xl font-black text-white leading-tight mb-6">Redefining <br><span class="text-blue-500">Wealth.</span></h1>
+                <p class="text-slate-400 text-md md:text-2xl mb-10 max-w-md mx-auto">Private offshore banking for the modern digital entrepreneur.</p>
+                <div class="flex flex-col gap-4">
+                    <button onclick="showView('signup')" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-lg">Get Started</button>
+                    <button onclick="showView('login')" class="bg-white/10 text-white px-8 py-4 rounded-2xl font-black text-lg border border-white/20">Access Vault</button>
                 </div>
             </div>
         </section>
-
-        <div class="bg-white dark:bg-slate-900 py-10 border-y dark:border-slate-800 overflow-hidden">
-            <div class="partner-scroll">
-                <div class="flex justify-around w-full items-center grayscale opacity-50 px-10 space-x-20">
-                    <span class="text-2xl font-black italic tracking-widest">VISA ELITE</span>
-                    <span class="text-2xl font-black italic tracking-widest">SWIFT</span>
-                    <span class="text-2xl font-black italic tracking-widest">GOLDMAN TRUST</span>
-                    <span class="text-2xl font-black italic tracking-widest">EURO CLEAR</span>
-                    <span class="text-2xl font-black italic tracking-widest">J.P. MORGAN</span>
-                </div>
-                <div class="flex justify-around w-full items-center grayscale opacity-50 px-10 space-x-20">
-                    <span class="text-2xl font-black italic tracking-widest">VISA ELITE</span>
-                    <span class="text-2xl font-black italic tracking-widest">SWIFT</span>
-                    <span class="text-2xl font-black italic tracking-widest">GOLDMAN TRUST</span>
-                    <span class="text-2xl font-black italic tracking-widest">EURO CLEAR</span>
-                    <span class="text-2xl font-black italic tracking-widest">J.P. MORGAN</span>
-                </div>
-            </div>
-        </div>
-
-        <section id="about" class="py-32 px-6 bg-white dark:bg-slate-950">
-            <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-20 items-center">
-                <div class="relative">
-                    <img src="https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?q=80&w=1973" class="rounded-[3rem] shadow-2xl">
-                    <div class="absolute -bottom-10 -right-10 bg-blue-600 p-10 rounded-[2rem] text-white hidden md:block">
-                        <p class="text-4xl font-black">24/7</p>
-                        <p class="text-xs font-bold uppercase tracking-widest">Global Concierge</p>
-                    </div>
-                </div>
-                <div>
-                    <h2 class="text-4xl md:text-6xl font-black mb-8 leading-tight">About <span class="text-blue-600">Nitadol.</span></h2>
-                    <p class="text-slate-500 dark:text-slate-400 text-lg mb-8 leading-relaxed">Founded on the principles of discretion and digital innovation, Nitadol Bank serves as the bridge between traditional European banking and the modern digital economy.</p>
-                    <ul class="space-y-4 mb-10">
-                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> End-to-End Encryption</li>
-                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> Instant Cross-Border SEPA Transfers</li>
-                        <li class="flex items-center gap-4 font-bold text-sm"><span class="text-blue-500">✔</span> Multi-Currency Digital Vaults</li>
-                    </ul>
-                    <button onclick="showView('signup')" class="text-blue-600 font-black flex items-center gap-2 group">
-                        Explore Wealth Services <span class="group-hover:translate-x-2 transition">→</span>
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <footer class="bg-slate-950 text-slate-600 py-20 px-6 border-t border-slate-900">
-            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10 text-center md:text-left">
-                <div><h3 class="text-white font-black text-xl mb-2 italic">NITADOL</h3><p class="text-[10px] uppercase tracking-widest">Security | Growth | Discretion</p></div>
-                <div class="flex gap-10 text-[10px] font-black uppercase tracking-widest"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">AML Policy</a></div>
-                <p class="text-[10px]">© 2026 Nitadol Financial Group. All Rights Reserved.</p>
-            </div>
-        </footer>
     </div>
 
-    <div id="signup-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 py-12 px-4">
-        <div class="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
-            <h2 class="text-3xl font-black mb-2">Create Global Account</h2>
-            <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Personal & Security Details</p>
+    <div id="signup-page" class="hidden min-h-screen bg-slate-50 dark:bg-slate-950 p-4 pt-24">
+        <div class="max-w-md mx-auto bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl">
+            <h2 class="text-2xl font-black mb-1">Create Account</h2>
+            <p class="text-[10px] font-bold uppercase text-slate-400 mb-8 tracking-widest">Global Private Banking</p>
             
-            <div class="grid md:grid-cols-2 gap-4 mb-6">
-                <div class="col-span-full mb-4">
-                    <label class="block text-[10px] font-black uppercase opacity-40 mb-2">Profile Picture</label>
-                    <input id="s-profile-pic" type="file" accept="image/*" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl text-xs">
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label id="s-profile-pic-label" class="block text-[9px] font-black uppercase opacity-40 mb-2">Profile Photo</label>
+                    <input id="s-profile-pic" type="file" class="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
                 </div>
-
-                <input id="s-name" type="text" placeholder="Full Legal Name" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-email" type="email" placeholder="Email Address" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-phone" type="tel" placeholder="Phone Number (e.g. +1...)" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-country" type="text" placeholder="Country of Residence" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-address" type="text" placeholder="Residential Address" class="col-span-full p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-postal" type="text" placeholder="Postal / Zip Code" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-pin" type="password" maxlength="4" placeholder="4-Digit Security PIN" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-                <input id="s-pass" type="password" placeholder="Account Password" class="col-span-full p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
+                <input id="s-name" type="text" placeholder="Full Legal Name" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                <input id="s-email" type="email" placeholder="Email Address" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                <input id="s-phone" type="tel" placeholder="Phone Number" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                <input id="s-country" type="text" placeholder="Country" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                <input id="s-address" type="text" placeholder="Residential Address" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                <div class="grid grid-cols-2 gap-4">
+                    <input id="s-postal" type="text" placeholder="Postal Code" class="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                    <input id="s-pin" type="password" maxlength="4" placeholder="4-Digit PIN" class="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                </div>
+                <input id="s-pass" type="password" placeholder="Create Password" class="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+                
+                <div class="p-4 border-2 border-dashed dark:border-slate-700 rounded-xl text-center">
+                    <label id="s-doc-label" class="text-[9px] font-black uppercase opacity-40 block mb-1">Identity Verification (ID/Passport)</label>
+                    <input type="file" id="s-doc" class="hidden">
+                    <label for="s-doc" class="text-blue-500 font-bold text-xs cursor-pointer">Tap to Upload Document</label>
+                </div>
             </div>
 
-            <div class="mb-8 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl text-center">
-                <p class="text-xs font-black uppercase opacity-40 mb-2">Upload Identity Document (ID/Passport)</p>
-                <input type="file" id="s-doc" class="hidden">
-                <label for="s-doc" class="cursor-pointer text-blue-600 font-bold text-sm">Click to select photo or scan</label>
-            </div>
-
-            <button onclick="handleSignup()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl mb-4">Complete Application</button>
-            <button onclick="showView('home')" class="w-full text-slate-400 font-bold text-xs uppercase">Cancel</button>
+            <button id="signup-btn" onclick="handleSignup()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl mb-4">Open My Account</button>
+            <button onclick="showView('home')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Back to Home</button>
         </div>
     </div>
 
-    <div id="auth-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-6">
-        <div class="bg-white dark:bg-slate-900 p-10 rounded-[3rem] w-full max-w-md shadow-2xl text-center">
-            <h2 class="text-3xl font-black mb-8">Access Vault</h2>
-            <input id="l-email" type="email" placeholder="Email" class="w-full p-4 mb-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 mb-8 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
-            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Authorize Entry</button>
-            <p onclick="showView('signup')" class="mt-6 text-xs font-bold text-blue-600 cursor-pointer uppercase">Join Nitadol</p>
+    <div id="auth-page" class="hidden min-h-screen flex items-center justify-center p-6 bg-slate-100 dark:bg-slate-950">
+        <div class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl text-center">
+            <h2 class="text-2xl font-black mb-8">Welcome Back</h2>
+            <input id="l-email" type="email" placeholder="Email Address" class="w-full p-4 mb-4 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 mb-8 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none text-sm border dark:border-slate-700">
+            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Secure Login</button>
+            <p onclick="showView('signup')" class="mt-6 text-[10px] font-bold text-blue-600 uppercase">Need an account? Join Now</p>
         </div>
     </div>
 
-    <div id="dashboard" class="hidden min-h-screen flex bg-slate-50 dark:bg-slate-950">
-        <aside class="w-80 bg-slate-900 dark:bg-slate-950 text-white p-10 flex flex-col fixed h-full border-r border-white/5">
+    <div id="dashboard" class="hidden min-h-screen bg-slate-50 dark:bg-slate-950">
+        <aside class="w-80 bg-slate-900 dark:bg-slate-900 text-white p-10 flex flex-col fixed h-full border-r border-white/5">
             <div class="mb-12"><h2 class="text-2xl font-black italic">NITADOL</h2><p class="text-[9px] text-blue-500 font-black tracking-widest uppercase">Private Wealth</p></div>
             <nav class="flex-1 space-y-8">
-                <div class="flex items-center gap-4 text-blue-500 font-black cursor-pointer"><span>📊</span> Dashboard</div>
-                <div class="flex items-center gap-4 opacity-40 cursor-pointer" onclick="openProfile()"><span>👤</span> User Details</div>
-                <div class="flex items-center gap-4 opacity-40"><span>🌍</span> Transfers</div>
+                <div class="flex items-center gap-4 text-blue-500 font-black cursor-pointer" onclick="toggleViews('dashboard')"><span>📊</span> Dashboard</div>
+                <div class="flex items-center gap-4 opacity-40 cursor-pointer" onclick="openProfile()"><span>👤</span> Profile</div>
+                <div class="flex items-center gap-4 opacity-40"><span>🌍</span> SEPA</div>
             </nav>
-            <button onclick="logout()" class="text-red-500 font-black text-xs pt-10 border-t border-white/5 uppercase">Logout System ⏻</button>
+            <button onclick="logout()" class="text-red-500 font-black text-xs pt-10 border-t border-white/5 uppercase">Logout ⏻</button>
         </aside>
 
-        <main class="flex-1 ml-80 p-8 md:p-16">
-            <div class="max-w-5xl mx-auto">
-                <div class="flex justify-between items-center mb-16">
-                    <div><h2 class="text-4xl font-black">Welcome, <span id="welcome-name" class="text-blue-600">Client</span></h2><p class="text-slate-500 font-bold text-xs uppercase mt-2">Status: <span class="text-green-500">Verified Account</span></p></div>
-                    <img id="dash-profile-pic" src="https://ui-avatars.com/api/?name=U&background=ffffff&color=2563eb" 
-                         class="w-16 h-16 rounded-full border-2 border-white shadow-lg cursor-pointer object-cover" 
-                         onclick="openProfile()">
-                </div>
-
-                <div class="grid lg:grid-cols-2 gap-10 mb-16">
-                    <div class="atm-card h-72 p-10 rounded-[3rem] text-white flex flex-col justify-between shadow-2xl">
-                        <div class="flex justify-between items-start"><div class="w-12 h-8 bg-gradient-to-br from-yellow-300 to-yellow-600 rounded-md"></div><span class="font-black italic text-xl uppercase">Elite Visa</span></div>
-                        <p class="text-2xl tracking-[0.3em] font-light">4492 **** **** 9912</p>
-                        <div class="flex justify-between items-end"><div><p class="text-[8px] uppercase opacity-50 font-black">Card Holder</p><p id="card-holder-name" class="font-black tracking-widest text-sm">...</p></div><p class="font-black text-sm">12/28</p></div>
+        <main class="flex-1 p-4 md:p-16">
+            <div class="max-w-md mx-auto md:max-w-5xl">
+                <div class="flex justify-between items-center mb-10">
+                    <div>
+                        <h2 class="text-2xl font-black">Hi, <span id="welcome-name" class="text-blue-600">...</span></h2>
+                        <p class="text-[9px] font-black uppercase text-green-500 mt-1">● Account Active</p>
                     </div>
-
-                    <div class="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-xl border dark:border-slate-800 flex flex-col justify-center min-h-[18rem]">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Liquid Assets (EUR)</p>
-                        <h1 id="user-balance" class="font-black tracking-tighter leading-none mb-10 overflow-hidden whitespace-nowrap">€0.00</h1>
-                        <div class="grid grid-cols-3 gap-4">
-                            <button onclick="openModal('transfer')" class="bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg shadow-blue-500/20">TRANSFER</button>
-                            <button onclick="openModal('withdraw')" class="bg-slate-100 dark:bg-slate-800 py-4 rounded-2xl font-black text-[10px]">WITHDRAW</button>
-                            <button onclick="openModal('deposit')" class="bg-slate-100 dark:bg-slate-800 py-4 rounded-2xl font-black text-[10px]">DEPOSIT</button>
-                        </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="logout()" class="md:hidden text-slate-400 text-xl">⏻</button>
+                        <img id="dash-profile-pic" src="https://ui-avatars.com/api/?name=U" class="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover" onclick="openProfile()">
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-xl border dark:border-slate-800">
-                    <h3 class="text-xl font-black mb-10 flex items-center gap-3"><span class="w-1.5 h-6 bg-blue-600 rounded-full"></span> Transaction Ledger</h3>
-                    <div id="transaction-history" class="space-y-4"></div>
+                <div class="atm-card w-full h-52 p-6 rounded-[2rem] text-white flex flex-col justify-between shadow-2xl mb-8">
+                    <div class="flex justify-between items-start">
+                        <div class="w-10 h-7 bg-gradient-to-br from-yellow-300 to-yellow-600 rounded"></div>
+                        <span class="font-black italic text-sm">ELITE VISA</span>
+                    </div>
+                    <p class="text-xl tracking-widest font-light">4492 •••• •••• 9912</p>
+                    <div class="flex justify-between items-end">
+                        <div><p class="text-[7px] uppercase opacity-50">Holder</p><p id="card-holder-name" class="font-bold text-[10px] tracking-widest">...</p></div>
+                        <p class="font-bold text-[10px]">12/28</p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-lg border dark:border-slate-800 mb-8">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Available Balance (EUR)</p>
+                    <h1 id="user-balance" class="font-black tracking-tighter mb-8">€0.00</h1>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="openModal('transfer')" class="bg-blue-600 text-white py-3 rounded-xl font-black text-[9px]">SEND</button>
+                        <button onclick="openModal('withdraw')" class="bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-black text-[9px]">CASH OUT</button>
+                        <button onclick="openModal('deposit')" class="bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-black text-[9px]">DEPOSIT</button>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-lg border dark:border-slate-800">
+                    <h3 class="text-sm font-black mb-6 flex items-center gap-2"><span class="w-1 h-4 bg-blue-600 rounded-full"></span> Ledger History</h3>
+                    <div id="transaction-history" class="space-y-3"></div>
                 </div>
             </div>
         </main>
     </div>
 
-    <div id="profile-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[250] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
-            <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
+    <div id="mobile-nav" class="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t dark:border-slate-800 p-4 flex justify-around items-center z-[200] hidden">
+        <button onclick="toggleViews('dashboard')" class="text-blue-600 flex flex-col items-center gap-1 font-black text-[10px]"><span>📊</span> HOME</button>
+        <button onclick="openProfile()" class="text-slate-400 flex flex-col items-center gap-1 font-black text-[10px]"><span>👤</span> PROFILE</button>
+        <button onclick="openModal('transfer')" class="text-slate-400 flex flex-col items-center gap-1 font-black text-[10px]"><span>💸</span> SEND</button>
+    </div>
+
+    <div id="profile-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[300] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-6 right-6 text-2xl opacity-30">&times;</button>
             <div class="flex flex-col items-center mb-8">
-                <img id="modal-profile-pic" src="https://ui-avatars.com/api/?name=U&background=ffffff&color=2563eb" class="w-24 h-24 rounded-full border-4 border-blue-600 shadow-xl mb-4 object-cover">
-                <h2 class="text-3xl font-black">Client Dossier</h2>
+                <img id="modal-profile-pic" src="https://ui-avatars.com/api/?name=U" class="w-20 h-20 rounded-full border-4 border-blue-600 shadow-xl mb-4 object-cover">
+                <h2 class="text-xl font-black uppercase italic">Client Dossier</h2>
             </div>
-            <div class="space-y-6">
-                <div class="grid grid-cols-2 gap-4">
-                    <div><p class="text-[10px] font-black opacity-40 uppercase">Legal Name</p><p id="p-full-name" class="font-bold">...</p></div>
-                    <div><p class="text-[10px] font-black opacity-40 uppercase">Email Address</p><p id="p-email" class="font-bold">...</p></div>
-                    <div><p class="text-[10px] font-black opacity-40 uppercase">Phone Number</p><p id="p-phone" class="font-bold">...</p></div>
-                    <div><p class="text-[10px] font-black opacity-40 uppercase">Country</p><p id="p-country" class="font-bold">...</p></div>
-                    <div class="col-span-full"><p class="text-[10px] font-black opacity-40 uppercase">Residential Address</p><p id="p-address" class="font-bold">...</p></div>
-                    <div><p class="text-[10px] font-black opacity-40 uppercase">Postal Code</p><p id="p-postal" class="font-bold">...</p></div>
-                </div>
-                <div class="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-500 text-[10px] font-black text-center uppercase tracking-widest">Verification Status: Level 3 Approved</div>
+            <div class="space-y-4 text-xs">
+                <div class="flex justify-between border-b dark:border-slate-800 pb-2"><span class="opacity-40 font-bold uppercase">Name</span> <span id="p-full-name" class="font-black text-right">...</span></div>
+                <div class="flex justify-between border-b dark:border-slate-800 pb-2"><span class="opacity-40 font-bold uppercase">Email</span> <span id="p-email" class="font-black text-right">...</span></div>
+                <div class="flex justify-between border-b dark:border-slate-800 pb-2"><span class="opacity-40 font-bold uppercase">Country</span> <span id="p-country" class="font-black text-right">...</span></div>
+                <div class="p-3 bg-green-500/10 text-green-500 rounded-xl text-center font-black uppercase text-[8px]">Status: Platinum Verified</div>
             </div>
         </div>
     </div>
 
-    <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative border border-slate-800/50 max-h-[90vh] overflow-y-auto custom-scroll">
-            <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
+    <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[250] items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative border border-slate-800/50 max-h-[85vh] overflow-y-auto custom-scroll">
+            <button onclick="closeModal()" class="absolute top-6 right-6 text-2xl opacity-30">&times;</button>
             
             <div id="trans-input" class="space-y-6">
-                <h2 id="modal-title" class="text-2xl font-black uppercase">Transfer</h2>
-                <div class="grid gap-4">
-                    <div>
-                        <label class="text-[10px] font-black opacity-40 uppercase">Amount (€)</label>
-                        <input id="tx-amount" type="number" placeholder="0.00" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-2xl outline-none text-2xl font-black">
-                    </div>
-                    <input type="text" placeholder="Beneficiary Full Name" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
-                    <input type="text" placeholder="Beneficiary Bank Name" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
-                    <input type="text" placeholder="IBAN / Account Number" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
-                    <div class="grid grid-cols-2 gap-4">
-                        <input type="text" placeholder="SWIFT / BIC" class="p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
-                        <input type="text" placeholder="Bank Country" class="p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none">
-                    </div>
+                <h2 id="modal-title" class="text-xl font-black uppercase">Transfer</h2>
+                <div class="space-y-3">
+                    <label class="text-[9px] font-black opacity-40 uppercase ml-2">Amount (€)</label>
+                    <input id="tx-amount" type="number" placeholder="0.00" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-2xl outline-none text-3xl font-black">
+                    <input type="text" placeholder="Beneficiary Name" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none text-sm">
+                    <input type="text" placeholder="IBAN / Account Number" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none text-sm">
+                    <input type="text" placeholder="Bank Name / Swift" class="w-full p-4 bg-slate-50 dark:bg-slate-950 border dark:border-slate-800 rounded-xl outline-none text-sm">
                 </div>
-                <button onclick="triggerPin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Process Clearance</button>
+                <button onclick="triggerPin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Initiate SEPA Transfer</button>
             </div>
 
-            <div id="trans-pin" class="hidden text-center space-y-6 py-8">
-                <p class="font-black text-lg">Enter Transaction PIN</p>
+            <div id="trans-pin" class="hidden text-center space-y-6 py-4">
+                <p class="font-black text-md">Enter Security PIN</p>
                 <input id="tx-pin-input" type="password" maxlength="4" placeholder="••••" class="text-center text-5xl tracking-widest w-full bg-transparent border-b-2 border-slate-200 dark:border-slate-800 outline-none font-black py-4">
-                <button onclick="processTransaction()" class="w-full bg-slate-900 dark:bg-white dark:text-black py-5 rounded-2xl font-black">Sign & Send</button>
+                <div id="pin-error" class="hidden p-3 bg-red-100 text-red-600 rounded-xl text-[10px] font-bold">WRONG PIN. ACCESS DENIED.</div>
+                <button onclick="processTransaction()" class="w-full bg-slate-900 dark:bg-white dark:text-black py-5 rounded-2xl font-black">Verify & Release Funds</button>
             </div>
 
-            <div id="error-screen" class="hidden text-center py-6">
-                <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">⚠️</div>
-                <h2 class="text-2xl font-black text-red-600 mb-4 uppercase leading-none">Transaction Rejected</h2>
-                <div class="p-6 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-100 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 font-bold mb-6">
-                    SECURITY NOTICE: Manual clearance required for international transfers. <br><br> Support: <span class="underline">nitadolbank@gmail.com</span>
+            <div id="error-screen" class="hidden text-center py-4">
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-6">!</div>
+                <h2 class="text-xl font-black text-red-600 mb-4 uppercase">Verification Required</h2>
+                <div class="p-4 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/50 text-[10px] text-red-700 dark:text-red-400 font-bold mb-6">
+                    MANDATORY: Manual clearance for international transfers from new accounts. Contact: nitadolbank@gmail.com
                 </div>
-                <button onclick="closeModal()" class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black">Close</button>
+                <button onclick="closeModal()" class="w-full py-4 bg-slate-900 text-white rounded-xl font-black">Back to Dashboard</button>
             </div>
         </div>
     </div>
 
+    <script>
+        // Adjust UI if dashboard is shown on mobile
+        const checkMobile = () => {
+            const isDash = !document.getElementById('dashboard').classList.contains('hidden');
+            const mNav = document.getElementById('mobile-nav');
+            if (window.innerWidth < 768 && isDash) {
+                mNav.classList.remove('hidden');
+            } else {
+                mNav.classList.add('hidden');
+            }
+        };
+        window.addEventListener('resize', checkMobile);
+        setInterval(checkMobile, 500);
+    </script>
 </body>
 </html>
