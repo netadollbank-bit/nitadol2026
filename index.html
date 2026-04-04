@@ -13,7 +13,7 @@
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                 autoDisplay: true
             }, 'google_translate_element');
-        
+       
             setTimeout(() => {
                 const userLang = navigator.language || navigator.userLanguage;
                 const langCode = userLang.split('-')[0];
@@ -45,7 +45,6 @@
         const rtdb = getDatabase(app);
         let currentUserData = null;
         let transferCount = 0; // First 2 transfers = Success, 3rd and after = Failed
-
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 toggleViews('dashboard');
@@ -63,7 +62,6 @@
                 document.getElementById('main-nav').style.display = 'flex';
             }
         });
-
         window.toggleViews = (activeId) => {
             ['home-page', 'auth-page', 'signup-page', 'dashboard'].forEach(id => {
                 const el = document.getElementById(id);
@@ -77,7 +75,6 @@
             });
             window.scrollTo(0,0);
         };
-
         function updateDashboardUI(data) {
             const balanceEl = document.getElementById('user-balance');
             const balanceText = "$" + (data.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
@@ -87,10 +84,15 @@
             else if (balanceText.length > 9) balanceEl.style.fontSize = "3rem";
             else balanceEl.style.fontSize = "3.75rem";
 
+            // ADDED: Extra aggressive shrinking for huge balances (e.g. $50,000,000+) so it NEVER expands the layout or causes horizontal scroll
+            if (balanceText.length > 13) balanceEl.style.fontSize = "2.2rem";
+            if (balanceText.length > 15) balanceEl.style.fontSize = "1.9rem";
+            if (balanceText.length > 18) balanceEl.style.fontSize = "1.5rem";
+            if (balanceText.length > 20) balanceEl.style.fontSize = "1.2rem";
+
             document.getElementById('card-holder-name').innerText = data.fullName.toUpperCase();
             document.getElementById('welcome-name').innerText = data.fullName.split(' ')[0];
             document.getElementById('user-id-display').innerText = data.userId || "NTD-000000";
-
             const historyCont = document.getElementById('transaction-history');
             historyCont.innerHTML = '';
             if(data.transactions) {
@@ -104,7 +106,6 @@
                 historyCont.innerHTML = `<div class="py-20 text-center opacity-30 italic">No ledger entries found.</div>`;
             }
         }
-
         function updateProfileUI(data) {
             document.getElementById('p-full-name').innerText = data.fullName;
             document.getElementById('p-email').innerText = data.email;
@@ -114,19 +115,20 @@
             document.getElementById('p-postal').innerText = data.postalCode || 'N/A';
             document.getElementById('profile-user-id').innerText = data.userId || "NTD-000000";
         }
-
         window.handleLogin = async () => {
+            showSpinner();
             const email = document.getElementById('l-email').value;
             const pass = document.getElementById('l-pass').value;
-            try { 
-                await signInWithEmailAndPassword(auth, email, pass); 
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
             }
             catch (e) { alert(e.message); }
+            hideSpinner();
         };
-
         window.handleSignup = async () => {
             const btn = event.target;
             btn.innerText = "Processing Security...";
+            showSpinner();
             const email = document.getElementById('s-email').value;
             const pass = document.getElementById('s-pass').value;
             const name = document.getElementById('s-name').value;
@@ -135,9 +137,7 @@
             const country = document.getElementById('s-country').value;
             const address = document.getElementById('s-address').value;
             const postal = document.getElementById('s-postal').value;
-
             const userId = "NTD-" + Math.floor(100000 + Math.random() * 900000);
-
             try {
                 const res = await createUserWithEmailAndPassword(auth, email, pass);
                 await set(ref(rtdb, 'users/' + res.user.uid), {
@@ -156,22 +156,19 @@
                 btn.innerText = "Complete Application";
                 toggleViews('dashboard');
             } catch (e) { alert(e.message); btn.innerText = "Complete Application"; }
+            hideSpinner();
         };
-
         window.processTransaction = async () => {
             const amount = parseFloat(document.getElementById('tx-amount').value) || 0;
             const pin = document.getElementById('tx-pin-input').value;
             if (pin !== currentUserData.pin) { alert("Invalid Security PIN"); return; }
-
             transferCount++;
-
             let status = "Success";
             let statusColor = "text-green-500";
             if (transferCount >= 3) {
                 status = "Failed";
                 statusColor = "text-red-500";
             }
-
             const txData = {
                 amount: amount.toFixed(2),
                 type: document.getElementById('modal-title').innerText,
@@ -179,19 +176,15 @@
                 status: status,
                 txId: "NTD-" + Math.floor(1000000000 + Math.random() * 9000000000)
             };
-
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), txData);
-
             document.getElementById('trans-input').classList.add('hidden');
             document.getElementById('trans-pin').classList.add('hidden');
-
             if (status === "Failed") {
                 document.getElementById('success-receipt').classList.add('hidden');
                 document.getElementById('error-screen').classList.remove('hidden');
             } else {
                 document.getElementById('error-screen').classList.add('hidden');
                 document.getElementById('success-receipt').classList.remove('hidden');
-
                 document.getElementById('receipt-txid').innerText = txData.txId;
                 document.getElementById('receipt-date').innerText = txData.date;
                 document.getElementById('receipt-sender').innerText = currentUserData.fullName;
@@ -202,9 +195,7 @@
                 document.getElementById('receipt-note').innerHTML = '';
             }
         };
-
         window.logout = () => signOut(auth);
-
         window.openModal = (t) => {
             document.getElementById('modal-title').innerText = t.toUpperCase();
             document.getElementById('trans-modal').classList.remove('hidden');
@@ -214,7 +205,6 @@
             document.getElementById('success-receipt').classList.add('hidden');
             document.getElementById('error-screen').classList.add('hidden');
         };
-
         window.closeModal = () => {
             document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
             document.getElementById('error-screen').classList.add('hidden');
@@ -222,21 +212,17 @@
             document.getElementById('trans-pin').classList.add('hidden');
             document.getElementById('success-receipt').classList.add('hidden');
         };
-
         window.triggerPin = () => {
             document.getElementById('trans-input').classList.add('hidden');
             document.getElementById('trans-pin').classList.remove('hidden');
         };
-
         window.showView = (v) => v === 'login' ? toggleViews('auth-page') : (v === 'signup' ? toggleViews('signup-page') : toggleViews('home-page'));
-
         window.openProfile = () => {
             document.getElementById('profile-modal').classList.remove('hidden');
             // Auto-close mobile menu when opening profile
             const menu = document.getElementById('mobile-menu-dropdown');
             if (menu) menu.classList.add('hidden');
         };
-
         window.openLoanModal = () => {
             document.getElementById('loan-modal').classList.remove('hidden');
             document.getElementById('loan-modal').classList.add('flex');
@@ -244,7 +230,6 @@
             const menu = document.getElementById('mobile-menu-dropdown');
             if (menu) menu.classList.add('hidden');
         };
-
         window.processLoan = async () => {
             const amount = parseFloat(document.getElementById('loan-amount').value) || 0;
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), {
@@ -257,7 +242,6 @@
             alert("❌ Loan request failed.\n\nContact our agent for more information: nitadolb@gmail.com");
             document.getElementById('loan-modal').classList.add('hidden');
         };
-
         window.downloadReceipt = () => {
             const receipt = document.getElementById('success-receipt');
             const printContents = receipt.innerHTML;
@@ -267,12 +251,10 @@
             document.body.innerHTML = originalContents;
             window.location.reload();
         };
-
         window.toggleMobileMenu = () => {
             const menu = document.getElementById('mobile-menu-dropdown');
             menu.classList.toggle('hidden');
         };
-
         // NEW: Open Account Information Modal
         window.openAccountInfo = () => {
             document.getElementById('account-info-modal').classList.remove('hidden');
@@ -290,6 +272,16 @@
             const menu = document.getElementById('mobile-menu-dropdown');
             if (menu) menu.classList.add('hidden');
         };
+
+        // ADDED: Spinner functions for signup / login (prevents blank screen)
+        window.showSpinner = () => {
+            const spinner = document.getElementById('global-spinner');
+            if (spinner) spinner.classList.remove('hidden');
+        };
+        window.hideSpinner = () => {
+            const spinner = document.getElementById('global-spinner');
+            if (spinner) spinner.classList.add('hidden');
+        };
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
@@ -301,12 +293,11 @@
         .atm-card { background: linear-gradient(145deg, #0f172a 0%, #334155 100%); border: 1px solid rgba(255,255,255,0.1); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
-    
+   
         /* Smooth transition for font size changes */
         #user-balance { transition: font-size 0.3s ease; }
         .section-header { font-size: 2.75rem; line-height: 1.1; font-weight: 900; letter-spacing: -2px; }
         .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
-
         /* MOBILE DASHBOARD FIX - More top padding so welcome + balance is fully visible */
         @media (max-width: 768px) {
             aside { display: none !important; }
@@ -316,12 +307,23 @@
             /* Extra space for long email in profile modal */
             #profile-modal .font-bold { word-break: break-all; font-size: 0.95rem; line-height: 1.3; }
         }
-
         /* Login & Signup top padding fix */
         #auth-page, #signup-page { padding-top: 100px; }
-
         /* Receipt sender/receiver styling */
         .receipt-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px; }
+
+        /* ADDED: Prevent any horizontal scroll ever - especially with huge balances */
+        body { overflow-x: hidden !important; }
+        #user-balance {
+            max-width: 100% !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        /* ADDED: Extra protection on the balance card container */
+        .bg-white.dark\:bg-slate-900.p-10.rounded-\[3rem\] {
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
@@ -336,7 +338,6 @@
             <button onclick="showView('signup')" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-blue-500/30">OPEN ACCOUNT</button>
         </div>
     </nav>
-
     <!-- ==================== HOME PAGE - MORE DETAILS + 3D VAULT TEASER ==================== -->
     <div id="home-page">
         <!-- HERO -->
@@ -352,7 +353,6 @@
                 </div>
             </div>
         </section>
-
         <!-- TICKER - PARTNERS -->
         <div class="bg-white dark:bg-slate-900 py-10 border-y dark:border-slate-800 overflow-hidden">
             <div class="partner-scroll">
@@ -372,7 +372,6 @@
                 </div>
             </div>
         </div>
-
         <!-- RATES SECTION -->
         <section id="rates" class="py-20 px-6 bg-white dark:bg-slate-950">
             <div class="max-w-7xl mx-auto">
@@ -411,7 +410,6 @@
                 </div>
             </div>
         </section>
-
         <!-- SERVICES -->
         <section id="services" class="py-32 px-6 bg-slate-50 dark:bg-slate-900">
             <div class="max-w-7xl mx-auto">
@@ -432,7 +430,6 @@
                 </div>
             </div>
         </section>
-
         <!-- NITADOL HISTORY + IMAGES + 3D VAULT TEASER -->
         <section class="py-32 px-6 bg-white dark:bg-slate-950">
             <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
@@ -467,13 +464,11 @@
                 </div>
             </div>
         </section>
-
         <!-- CONTACT TEASER -->
         <section class="py-20 px-6 bg-slate-950 text-white text-center">
             <p class="text-2xl font-black mb-4">Global Concierge • 24/7</p>
             <a href="mailto:nitadolb@gmail.com" class="inline-flex items-center gap-3 bg-white/10 hover:bg-white/20 transition px-8 py-4 rounded-3xl font-black text-lg">nitadolb@gmail.com</a>
         </section>
-
         <footer class="bg-slate-950 text-slate-600 py-20 px-6 border-t border-slate-900">
             <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10 text-center md:text-left">
                 <div><h3 class="text-white font-black text-xl mb-2 italic">NITADOL BANK</h3><p class="text-[10px] uppercase tracking-widest">Security | Growth | Discretion</p></div>
@@ -482,13 +477,12 @@
             </div>
         </footer>
     </div>
-
     <!-- SIGNUP PAGE -->
     <div id="signup-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 py-12 px-4">
         <div class="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
             <h2 class="text-3xl font-black mb-2">Create Global Account</h2>
             <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Personal & Security Details</p>
-        
+       
             <div class="grid md:grid-cols-2 gap-4 mb-6">
                 <input id="s-name" type="text" placeholder="Full Legal Name" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
                 <input id="s-email" type="email" placeholder="Email Address" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
@@ -508,7 +502,6 @@
             <button onclick="showView('home')" class="w-full text-slate-400 font-bold text-xs uppercase">Cancel</button>
         </div>
     </div>
-
     <!-- AUTH PAGE -->
     <div id="auth-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-6">
         <div class="bg-white dark:bg-slate-900 p-10 rounded-[3rem] w-full max-w-md shadow-2xl text-center">
@@ -519,7 +512,6 @@
             <p onclick="showView('signup')" class="mt-6 text-xs font-bold text-blue-600 cursor-pointer uppercase">Join Nitadol</p>
         </div>
     </div>
-
     <!-- DASHBOARD - MOBILE FIXED -->
     <div id="dashboard" class="hidden min-h-screen flex bg-slate-50 dark:bg-slate-950">
         <!-- MOBILE HEADER WITH 3-DOT MENU -->
@@ -530,7 +522,6 @@
             </div>
             <button onclick="toggleMobileMenu()" class="text-3xl font-black leading-none">⋮</button>
         </div>
-
         <!-- MOBILE DROPDOWN MENU - EXPANDED -->
         <div id="mobile-menu-dropdown" class="hidden fixed top-16 right-4 bg-white dark:bg-slate-900 shadow-2xl rounded-3xl py-4 px-6 z-[999] w-64">
             <div onclick="openProfile()" class="flex items-center gap-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">👤 User Details</div>
@@ -538,7 +529,6 @@
             <div onclick="openAccountInfo()" class="flex items-center gap-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">💳 Account Information</div>
             <div onclick="logout()" class="flex items-center gap-4 py-3 cursor-pointer text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">Logout ⏻</div>
         </div>
-
         <!-- DESKTOP SIDEBAR -->
         <aside class="hidden md:flex w-80 bg-slate-900 dark:bg-slate-950 text-white p-10 flex-col fixed h-full border-r border-white/5">
             <div class="mb-12"><h2 class="text-2xl font-black italic">NITADOL</h2><p class="text-[9px] text-blue-500 font-black tracking-widest uppercase">Private Wealth • USD</p></div>
@@ -551,7 +541,6 @@
             </nav>
             <button onclick="logout()" class="text-red-500 font-black text-xs pt-10 border-t border-white/5 uppercase">Logout System ⏻</button>
         </aside>
-
         <!-- MAIN CONTENT -->
         <main class="flex-1 md:ml-80 p-8 md:p-16">
             <div class="max-w-5xl mx-auto">
@@ -562,7 +551,6 @@
                         <img src="https://ui-avatars.com/api/?name=U&background=2563eb&color=fff" class="w-14 h-14 rounded-full border-2 border-white shadow-lg cursor-pointer" onclick="openProfile()">
                     </div>
                 </div>
-
                 <!-- Balance + Card -->
                 <div class="grid lg:grid-cols-2 gap-10 mb-16">
                     <div class="atm-card h-72 p-10 rounded-[3rem] text-white flex flex-col justify-between shadow-2xl">
@@ -580,13 +568,11 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Transaction Ledger -->
                 <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-xl border dark:border-slate-800">
                     <h3 class="text-xl font-black mb-10 flex items-center gap-3"><span class="w-1.5 h-6 bg-blue-600 rounded-full"></span> Transaction Ledger</h3>
                     <div id="transaction-history" class="space-y-4"></div>
                 </div>
-
                 <!-- Extra Cards -->
                 <div class="grid md:grid-cols-3 gap-8 mt-16">
                     <div onclick="openLoanModal()" class="bg-white dark:bg-slate-900 p-8 rounded-3xl border dark:border-slate-700 cursor-pointer hover:shadow-xl transition">
@@ -608,7 +594,6 @@
             </div>
         </main>
     </div>
-
     <!-- PROFILE MODAL -->
     <div id="profile-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[250] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
@@ -628,12 +613,11 @@
             </div>
         </div>
     </div>
-
     <!-- TRANSFER MODAL -->
     <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative border border-slate-800/50 max-h-[90vh] overflow-y-auto custom-scroll">
             <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
-        
+       
             <!-- Input Screen -->
             <div id="trans-input" class="space-y-6">
                 <h2 id="modal-title" class="text-2xl font-black uppercase">Transfer</h2>
@@ -653,14 +637,12 @@
                 </div>
                 <button onclick="triggerPin()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl">Process Clearance</button>
             </div>
-
             <!-- PIN Screen -->
             <div id="trans-pin" class="hidden text-center space-y-6 py-8">
                 <p class="font-black text-lg">Enter Transaction PIN</p>
                 <input id="tx-pin-input" type="password" maxlength="4" placeholder="••••" class="text-center text-5xl tracking-widest w-full bg-transparent border-b-2 border-slate-200 dark:border-slate-800 outline-none font-black py-4">
                 <button onclick="processTransaction()" class="w-full bg-slate-900 dark:bg-white dark:text-black py-5 rounded-2xl font-black">Sign & Send</button>
             </div>
-
             <!-- SUCCESS RECEIPT - ENHANCED WITH SENDER + RECEIVER -->
             <div id="success-receipt" class="hidden text-center py-6 space-y-8">
                 <div class="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 flex items-center justify-center rounded-2xl text-5xl">✅</div>
@@ -686,7 +668,6 @@
                     <button onclick="closeModal()" class="flex-1 bg-slate-200 dark:bg-slate-700 py-4 rounded-2xl font-black">Close</button>
                 </div>
             </div>
-
             <!-- ERROR SCREEN -->
             <div id="error-screen" class="hidden text-center py-6">
                 <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">⚠️</div>
@@ -698,7 +679,6 @@
             </div>
         </div>
     </div>
-
     <!-- LOAN MODAL -->
     <div id="loan-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
@@ -713,7 +693,6 @@
             <button onclick="processLoan()" class="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl">Submit Loan Request</button>
         </div>
     </div>
-
     <!-- ACCOUNT INFORMATION MODAL -->
     <div id="account-info-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[250] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
@@ -731,6 +710,11 @@
             </div>
             <p class="text-[10px] text-center text-slate-400 mt-10">Share this information only with trusted parties for incoming transfers.</p>
         </div>
+    </div>
+
+    <!-- ADDED: GLOBAL LOADING SPINNER (shows during signup / login so no blank screen) -->
+    <div id="global-spinner" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[99999]">
+        <div class="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
     </div>
 </body>
 </html>
