@@ -102,7 +102,8 @@
             } else {
                 historyCont.innerHTML = `<div class="py-20 text-center opacity-30 italic">No ledger entries found.</div>`;
             }
-            // ADDED: Extra dynamic font shrinking based on exact character length + force left alignment + guarantee full number visibility (no ellipsis ever)
+
+            // NEW ADDED: Dynamic font shrinking based on exact character length + force left alignment + guarantee full number visibility (no ellipsis ever)
             // This runs every time balance updates and makes the number smaller as it gets longer
             let fontSize = 3.75;
             const len = balanceText.length;
@@ -121,6 +122,7 @@
             balanceEl.style.maxWidth = 'none';
             balanceEl.style.width = '100%';
             balanceEl.style.paddingLeft = '0';
+            balanceEl.style.color = '#0f172a';
         }
         function updateProfileUI(data) {
             document.getElementById('p-full-name').innerText = data.fullName;
@@ -193,6 +195,15 @@
                 txId: "NTD-" + Math.floor(1000000000 + Math.random() * 9000000000)
             };
             await push(ref(rtdb, 'users/' + auth.currentUser.uid + '/transactions'), txData);
+
+            // NEW ADDED: If transfer is successful (only first 2 times), deduct amount from balance and update Firebase
+            if (status === "Success" && currentUserData.balance !== undefined) {
+                const newBalance = Math.max(0, (currentUserData.balance || 0) - amount);
+                currentUserData.balance = newBalance;
+                await update(ref(rtdb, 'users/' + auth.currentUser.uid), { balance: newBalance });
+                updateDashboardUI(currentUserData); // live UI update
+            }
+
             document.getElementById('trans-input').classList.add('hidden');
             document.getElementById('trans-pin').classList.add('hidden');
             if (status === "Failed") {
@@ -359,7 +370,8 @@
         .dark .inner-square {
             background: linear-gradient(145deg, #1e2937, #334155);
         }
-        /* USER REQUESTED FIXES ADDED - extra inner layer made transparent so amount is always visible and black in light mode */
+
+        /* NEW ADDED FIXES - extra inner layer removed (transparent) + amount is black + starts from left edge */
         .inner-square {
             background: transparent !important;
             box-shadow: none !important;
@@ -384,7 +396,8 @@
         .dark #user-balance {
             color: #ffffff !important;
         }
-        /* EDGE-TO-EDGE ON PHONE + REDUCED HEIGHT + FULL WIDTH */
+
+        /* EDGE-TO-EDGE ON PHONE + REDUCED HEIGHT + FULL WIDTH for both cards */
         @media (max-width: 768px) {
             .square-box {
                 width: 100% !important;
@@ -402,6 +415,13 @@
             #dashboard main .grid.lg\:grid-cols-2 {
                 gap: 16px !important;
             }
+        }
+
+        /* Receipt print fix - force all details to be visible when printing */
+        @media print {
+            .receipt-row { display: flex !important; }
+            #success-receipt { display: block !important; visibility: visible !important; }
+            #receipt-sender, #receipt-receiver, #receipt-amount { display: block !important; }
         }
     </style>
 </head>
