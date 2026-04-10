@@ -489,6 +489,15 @@
         @media (min-width: 769px) {
             .mobile-header { display: flex !important; }
         }
+
+        /* === ADDED FIX FOR ACCOUNT BALANCE VISIBILITY IN CHROME DARK MODE (prefers-color-scheme: dark) === */
+        /* This forces white text on the balance when the system is in dark mode, overriding the JS inline color */
+        /* It ONLY activates in dark mode and uses !important so it beats the inline style.color = '#0f172a' */
+        @media (prefers-color-scheme: dark) {
+            #user-balance {
+                color: #ffffff !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
