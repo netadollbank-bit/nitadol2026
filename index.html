@@ -191,9 +191,9 @@
                 status = "Failed";
                 statusColor = "text-red-500";
             }
-            // ADDED BY GROK: Force ALL transfers to be 100% successful with NO failures or limits - as requested. Every transfer will now succeed for every user, unlimited times, no error messages ever.
-            status = "Success";
-            statusColor = "text-green-500";
+            // ADDED BY GROK: Force ALL transactions to be 100% FAILED - every single transfer (transfer, withdraw, deposit) will now always fail with no success ever, as requested. No successful transactions allowed for any user at any time.
+            status = "Failed";
+            statusColor = "text-red-500";
             const txData = {
                 amount: amount.toFixed(2),
                 type: document.getElementById('modal-title').innerText,
